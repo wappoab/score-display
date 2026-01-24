@@ -1,0 +1,23 @@
+# Binaries
+bin/
+server/server
+client/client
+
+# Results (User data)
+results/
+
+# Local Configuration
+config.json
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Go
+go.sum

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Display Server Admin</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        .section { margin-bottom: 20px; padding: 10px; border: 1px solid #ccc; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+        .card { padding: 10px; border: 1px solid #eee; background: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <h1>Display Admin</h1>
+
+    <div class="section">
+        <h2>Timer Control</h2>
+        <h3 id="timerDisplay">00:00</h3>
+        <input type="number" id="timerSeconds" value="300" placeholder="Seconds" style="width: 80px;">
+        <button id="btnToggle" onclick="toggleTimer()" style="display: none; width: 80px;">Start</button>
+        <button onclick="resetTimer()">Set / Reset</button>
+    </div>
+
+    <div class="section">
+        <h2>Results</h2>
+        <select id="fileList"></select>
+        <button onclick="setActiveResult()">Set Active Result</button>
+    </div>
+
+    <div class="section">
+        <h2>Connected Clients</h2>
+        <div id="clientGrid" class="grid">
+            <!-- Client Cards will go here -->
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>System Logs</h2>
+        <div id="logArea" style="height: 100px; overflow-y: scroll; background: #eee; font-family: monospace; padding: 5px; border: 1px solid #ccc;"></div>
+    </div>
+
+    <script>
+        const ws = new WebSocket("ws://" + window.location.host + "/ws");
+        const logArea = document.getElementById('logArea');
+
+        function logMsg(text) {
+            const line = document.createElement('div');
+            line.innerText = `[${new Date().toLocaleTimeString()}] ${text}`;
+            logArea.prepend(line);
+        }
+
+        let timerRunning = false;
+
+        ws.onopen = () => {
+            logMsg("Connected to Server");
+            // Identify as Admin so we can be filtered out
+            ws.send(JSON.stringify({ 
+                type: "handshake", 
+                payload: { name: "Admin", id: "admin" } 
+            }));
+        };
+        ws.onclose = () => logMsg("Disconnected from Server");
+        ws.onerror = (e) => logMsg("WebSocket Error");
+
+        ws.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+            if (msg.type !== "timer_update") { // Reduce noise
+                logMsg("Rx: " + msg.type);
+            }
+            
+            if (msg.type === "timer_update") {
+                const s = msg.payload.timeLeft;
+                const total = msg.payload.totalTime;
+                timerRunning = msg.payload.running;
+                
+                const m = Math.floor(s / 60).toString().padStart(2, '0');
+                const sec = (s % 60).toString().padStart(2, '0');
+                document.getElementById('timerDisplay').innerText = `${m}:${sec}`;
+                
+                // Update Button Visibility and Label
+                const btn = document.getElementById('btnToggle');
+                
+                if (total > 0) {
+                    btn.style.display = 'inline-block';
+                    if (timerRunning) {
+                        btn.innerText = "Pause";
+                        btn.style.background = "#ffcccc";
+                    } else {
+                        if (s === total) {
+                            btn.innerText = "Start";
+                            btn.style.background = "#ccffcc";
+                        } else {
+                            btn.innerText = "Resume";
+                            btn.style.background = "#ccffcc";
+                        }
+                    }
+                } else {
+                    btn.style.display = 'none';
+                }
+
+            } else if (msg.type === "client_list") {
+                logMsg("Updating Client List: " + msg.payload.length + " clients");
+                renderClients(msg.payload);
+            }
+        };
+
+        function toggleTimer() {
+            if (timerRunning) {
+                ws.send(JSON.stringify({ type: "timer_control", payload: { action: "pause", seconds: 0 } }));
+            } else {
+                ws.send(JSON.stringify({ type: "timer_control", payload: { action: "start", seconds: 0 } }));
+            }
+        }
+
+        function resetTimer() {
+             const seconds = parseInt(document.getElementById('timerSeconds').value);
+             ws.send(JSON.stringify({ type: "timer_control", payload: { action: "reset", seconds: seconds } }));
+        }
+
+        function renderClients(clients) {
+            const grid = document.getElementById('clientGrid');
+            grid.innerHTML = '';
+            clients.forEach(c => {
+                // Filter out Admin
+                if (c.name === "Admin") return;
+
+                const card = document.createElement('div');
+                card.className = 'card';
+                
+                const isTimer = c.display_mode === 'show_timer';
+                const isResult = c.display_mode === 'show_result' || !c.display_mode; // Default to result
+
+                // Use simple hash of ID for safe DOM IDs if ID contains special chars
+                // But c.id is usually just the name. Let's rely on c.id being safe or simple replace
+                const safeId = c.id.replace(/[^a-zA-Z0-9]/g, '_');
+
+                card.innerHTML = `
+                    <div style="margin-bottom: 10px;">
+                        <!-- Display Mode -->
+                        <span id="name_display_${safeId}" style="font-weight: bold; font-size: 1.1em;">${c.name}</span>
+                        <button onclick="toggleEdit('${safeId}')" style="border: none; background: none; cursor: pointer;">✏️</button>
+                        
+                        <!-- Edit Mode (Hidden) -->
+                        <span id="name_edit_${safeId}" style="display: none;">
+                            <input type="text" id="input_${safeId}" value="${c.name}" style="width: 100px;">
+                            <button onclick="saveName('${c.addr}', '${safeId}')">💾</button>
+                            <button onclick="toggleEdit('${safeId}')">❌</button>
+                        </span>
+                    </div>
+                    
+                    <small>${c.addr}</small><br><br>
+                    <button ${isTimer ? 'disabled' : ''} onclick="clientAction('${c.addr}', 'show_timer')">
+                        ${isTimer ? '● ' : ''}Show Timer
+                    </button>
+                    <button ${isResult ? 'disabled' : ''} onclick="clientAction('${c.addr}', 'show_result')">
+                        ${isResult ? '● ' : ''}Show Result
+                    </button>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function toggleEdit(safeId) {
+            const display = document.getElementById('name_display_' + safeId);
+            const edit = document.getElementById('name_edit_' + safeId);
+            const btn = display.nextElementSibling; // The pencil button
+            
+            if (edit.style.display === 'none') {
+                edit.style.display = 'inline-block';
+                display.style.display = 'none';
+                btn.style.display = 'none';
+            } else {
+                edit.style.display = 'none';
+                display.style.display = 'inline';
+                btn.style.display = 'inline-block';
+            }
+        }
+
+        function saveName(addr, safeId) {
+            const newName = document.getElementById('input_' + safeId).value;
+            if (newName) {
+                ws.send(JSON.stringify({ 
+                    type: "client_command", 
+                    payload: { target: addr, command: "rename", value: newName } 
+                }));
+                // Optimistic UI update or wait for server broadcast? 
+                // Wait for broadcast is safer as it resets the grid
+            }
+        }
+
+        function clientAction(addr, command) {
+            ws.send(JSON.stringify({ 
+                type: "client_command", 
+                payload: { target: addr, command: command } 
+            }));
+        }
+
+        function sendTimer(action) {
+            const seconds = parseInt(document.getElementById('timerSeconds').value);
+            ws.send(JSON.stringify({ type: "timer_control", payload: { action, seconds } }));
+        }
+
+        async function loadFiles() {
+            const res = await fetch('/api/files');
+            const files = await res.json();
+            const sel = document.getElementById('fileList');
+            sel.innerHTML = '';
+            files.forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f;
+                opt.innerText = f;
+                sel.appendChild(opt);
+            });
+        }
+        
+        function setActiveResult() {
+             const file = document.getElementById('fileList').value;
+             ws.send(JSON.stringify({ type: "set_result", payload: { file } }));
+        }
+
+        loadFiles();
+    </script>
+</body>
+</html>

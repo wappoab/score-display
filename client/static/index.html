@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Display Client</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+        
+        #resultFrame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+        }
+
+        #timerOverlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 20vw;
+            font-weight: bold;
+            display: none; /* Hidden by default */
+            z-index: 9999;
+        }
+
+        .active { display: flex !important; }
+    </style>
+</head>
+<body>
+    <iframe id="resultFrame" src="about:blank"></iframe>
+    <div id="timerOverlay">00:00</div>
+
+    <script>
+        let config = null;
+        let ws = null;
+
+        async function init() {
+            try {
+                const cfgReq = await fetch('/config');
+                config = await cfgReq.json();
+                
+                console.log("Connecting to Server at:", config.wsUrl);
+                ws = new WebSocket(config.wsUrl);
+
+                ws.onopen = () => {
+                    console.log("WS Connected");
+                    document.title = config.clientName;
+                    ws.send(JSON.stringify({ 
+                        type: "handshake", 
+                        payload: { name: config.clientName, id: config.clientName } 
+                    }));
+                };
+
+                ws.onmessage = (event) => {
+                    const msg = JSON.parse(event.data);
+                    handleMessage(msg);
+                };
+
+                ws.onclose = () => {
+                    console.log("WS Closed. Retrying...");
+                    setTimeout(init, 3000);
+                };
+
+            } catch (e) {
+                console.error("Failed to init:", e);
+                setTimeout(init, 2000);
+            }
+        }
+
+        function handleMessage(msg) {
+            const overlay = document.getElementById('timerOverlay');
+            const iframe = document.getElementById('resultFrame');
+            
+            if (msg.type === "timer_update") {
+                const state = msg.payload;
+                const m = Math.floor(state.timeLeft / 60).toString().padStart(2, '0');
+                const s = (state.timeLeft % 60).toString().padStart(2, '0');
+                overlay.innerText = `${m}:${s}`;
+            } else if (msg.type === "display_mode") {
+                if (msg.payload === "show_timer") {
+                    overlay.classList.add("active");
+                    iframe.style.visibility = 'hidden';
+                    iframe.style.opacity = '0';
+                } else {
+                    overlay.classList.remove("active");
+                    iframe.style.visibility = 'visible';
+                    iframe.style.opacity = '1';
+                }
+            } else if (msg.type === "set_result") {
+                const url = config.serverBaseUrl + "/results/" + msg.payload.file;
+                iframe.src = url;
+            } else if (msg.type === "update_config") {
+                if (msg.payload.key === "ClientName") {
+                    const newName = msg.payload.value;
+                    document.title = newName;
+                    
+                    // Persist to Go backend
+                    fetch('/config/update', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ clientName: newName })
+                    }).then(() => {
+                        config.clientName = newName;
+                        ws.send(JSON.stringify({ 
+                            type: "handshake", 
+                            payload: { name: newName, id: newName } 
+                        }));
+                    });
+                }
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
