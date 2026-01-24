@@ -18,9 +18,15 @@ func main() {
 
 	// Load Config
 	finalResultsDir := "./results" // Default
+	finalLanguage := "en"          // Default
 	cfg, err := loadConfig("server.json")
-	if err == nil && cfg.ResultsDir != "" {
-		finalResultsDir = cfg.ResultsDir
+	if err == nil {
+		if cfg.ResultsDir != "" {
+			finalResultsDir = cfg.ResultsDir
+		}
+		if cfg.Language != "" {
+			finalLanguage = cfg.Language
+		}
 	}
 
 	// Flag overrides config
@@ -38,6 +44,7 @@ func main() {
 
 	fmt.Printf("Starting Display Server on port %d...\n", *port)
 	fmt.Printf("Serving results from: %s\n", finalResultsDir)
+	fmt.Printf("Admin UI Language: %s\n", finalLanguage)
 
 	// Start mDNS discovery
 	startDiscovery(*port)
@@ -96,8 +103,10 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(struct {
 			ResultsDir string `json:"resultsDir"`
+			Language   string `json:"language"`
 		}{
 			ResultsDir: finalResultsDir,
+			Language:   finalLanguage,
 		})
 	})
 

@@ -1,0 +1,18 @@
+{
+    "title": "Display Admin",
+    "timer_control": "Timer Control",
+    "results": "Results",
+    "start": "Start",
+    "stop": "Stop",
+    "pause": "Pause",
+    "resume": "Resume",
+    "reset": "Set / Reset",
+    "set_active_result": "Set Active Result",
+    "connected_clients": "Connected Clients",
+    "system_logs": "System Logs",
+    "served_from": "Served from:",
+    "show_timer": "Show Timer",
+    "show_result": "Show Result",
+    "rename": "Rename",
+    "new_name_placeholder": "New Name"
+}

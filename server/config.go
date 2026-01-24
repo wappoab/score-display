@@ -7,6 +7,7 @@ import (
 
 type ServerConfig struct {
 	ResultsDir string `json:"resultsDir"`
+	Language   string `json:"language"`
 }
 
 func loadConfig(path string) (*ServerConfig, error) {

@@ -16,37 +16,41 @@
 
     <div style="display: flex; gap: 20px;">
         <div class="section" style="flex: 1;">
-            <h2>Timer Control</h2>
+            <h2 data-i18n="timer_control">Timer Control</h2>
             <h3 id="timerDisplay">00:00</h3>
             <input type="number" id="timerSeconds" value="300" placeholder="Seconds" style="width: 80px;">
-            <button id="btnToggle" onclick="toggleTimer()" style="display: none; width: 80px;">Start</button>
-            <button onclick="resetTimer()">Set / Reset</button>
+            <button id="btnToggle" onclick="toggleTimer()" style="display: none; width: 80px;" data-i18n="start">Start</button>
+            <button onclick="resetTimer()" data-i18n="reset">Set / Reset</button>
         </div>
 
-            <div class="section" style="flex: 1;">
-                <h2>Results</h2>
-                <select id="fileList"></select>
-                <button onclick="setActiveResult()">Set Active Result</button>
-                <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
-                    Served from: <span id="servedPath">loading...</span>
-                </div>
+        <div class="section" style="flex: 1;">
+            <h2 data-i18n="results">Results</h2>
+            <select id="fileList"></select>
+            <button onclick="setActiveResult()" data-i18n="set_active_result">Set Active Result</button>
+            <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                <span data-i18n="served_from">Served from:</span> <span id="servedPath">loading...</span>
             </div>
         </div>
+    </div>
+
     <div class="section">
-        <h2>Connected Clients</h2>
+        <h2 data-i18n="connected_clients">Connected Clients</h2>
         <div id="clientGrid" class="grid">
             <!-- Client Cards will go here -->
         </div>
     </div>
 
     <div class="section" id="logsSection" style="display: none;">
-        <h2>System Logs</h2>
+        <h2 data-i18n="system_logs">System Logs</h2>
         <div id="logArea" style="height: 100px; overflow-y: scroll; background: #eee; font-family: monospace; padding: 5px; border: 1px solid #ccc;"></div>
     </div>
 
     <script>
         const ws = new WebSocket("ws://" + window.location.host + "/ws");
         const logArea = document.getElementById('logArea');
+        let translations = {};
+        let currentLang = 'en';
+        let latestClients = [];
 
         // Show logs if debug=true
         if (new URLSearchParams(window.location.search).get('debug') === 'true') {
@@ -57,6 +61,37 @@
             const line = document.createElement('div');
             line.innerText = `[${new Date().toLocaleTimeString()}] ${text}`;
             logArea.prepend(line);
+        }
+        
+        async function loadTranslations(lang) {
+            try {
+                const res = await fetch(`/admin/locales/${lang}.json`);
+                if (res.ok) {
+                    translations = await res.json();
+                    applyTranslations();
+                }
+            } catch (e) {
+                console.error("Failed to load translations", e);
+            }
+        }
+
+        function applyTranslations() {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (translations[key]) {
+                    el.innerText = translations[key];
+                }
+            });
+            document.title = translations['title'] || "Display Admin";
+            
+            // Re-render dynamic components if we have data
+            if (latestClients.length > 0) {
+                renderClients(latestClients);
+            }
+        }
+
+        function t(key) {
+            return translations[key] || key;
         }
 
         let timerRunning = false;
@@ -89,28 +124,33 @@
                 
                 // Update Button Visibility and Label
                 const btn = document.getElementById('btnToggle');
+                const resetBtn = btn.nextElementSibling; // The reset button
                 
                 if (total > 0) {
                     btn.style.display = 'inline-block';
                     if (timerRunning) {
-                        btn.innerText = "Pause";
+                        btn.innerText = t("pause");
                         btn.style.background = "#ffcccc";
+                        resetBtn.style.display = 'none'; // Hide reset while running
                     } else {
+                        resetBtn.style.display = 'inline-block'; // Show reset
                         if (s === total) {
-                            btn.innerText = "Start";
+                            btn.innerText = t("start");
                             btn.style.background = "#ccffcc";
                         } else {
-                            btn.innerText = "Resume";
+                            btn.innerText = t("resume");
                             btn.style.background = "#ccffcc";
                         }
                     }
                 } else {
                     btn.style.display = 'none';
+                    resetBtn.style.display = 'inline-block';
                 }
 
             } else if (msg.type === "client_list") {
                 logMsg("Updating Client List: " + msg.payload.length + " clients");
-                renderClients(msg.payload);
+                latestClients = msg.payload;
+                renderClients(latestClients);
             }
         };
 
@@ -160,10 +200,10 @@
                     
                     <small>${c.addr}</small><br><br>
                     <button ${isTimer ? 'disabled' : ''} onclick="clientAction('${c.addr}', 'show_timer')">
-                        ${isTimer ? '● ' : ''}Show Timer
+                        ${isTimer ? '● ' : ''}${t('show_timer')}
                     </button>
                     <button ${isResult ? 'disabled' : ''} onclick="clientAction('${c.addr}', 'show_result')">
-                        ${isResult ? '● ' : ''}Show Result
+                        ${isResult ? '● ' : ''}${t('show_result')}
                     </button>
                 `;
                 grid.appendChild(card);
@@ -211,6 +251,13 @@
         }
 
         async function loadFiles() {
+            // Load Info (Lang + Path) first
+            const infoRes = await fetch('/api/info');
+            const info = await infoRes.json();
+            document.getElementById('servedPath').innerText = info.resultsDir;
+            currentLang = info.language || 'en';
+            await loadTranslations(currentLang);
+
             const res = await fetch('/api/files');
             const files = await res.json();
             const sel = document.getElementById('fileList');
@@ -221,11 +268,6 @@
                 opt.innerText = f;
                 sel.appendChild(opt);
             });
-            
-            // Also load info
-            const infoRes = await fetch('/api/info');
-            const info = await infoRes.json();
-            document.getElementById('servedPath').innerText = info.resultsDir;
         }
         
         function setActiveResult() {

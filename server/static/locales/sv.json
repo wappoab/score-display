@@ -1,0 +1,18 @@
+{
+    "title": "Display Admin",
+    "timer_control": "Timer",
+    "results": "Resultat",
+    "start": "Starta",
+    "stop": "Stoppa",
+    "pause": "Pausa",
+    "resume": "Återuppta",
+    "reset": "Sätt / Återställ",
+    "set_active_result": "Visa Resultat",
+    "connected_clients": "Anslutna Skärmar",
+    "system_logs": "Systemloggar",
+    "served_from": "Serveras från:",
+    "show_timer": "Visa Timer",
+    "show_result": "Visa Resultat",
+    "rename": "Byt Namn",
+    "new_name_placeholder": "Nytt Namn"
+}
