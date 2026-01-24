@@ -14,18 +14,20 @@
 <body>
     <h1>Display Admin</h1>
 
-    <div class="section">
-        <h2>Timer Control</h2>
-        <h3 id="timerDisplay">00:00</h3>
-        <input type="number" id="timerSeconds" value="300" placeholder="Seconds" style="width: 80px;">
-        <button id="btnToggle" onclick="toggleTimer()" style="display: none; width: 80px;">Start</button>
-        <button onclick="resetTimer()">Set / Reset</button>
-    </div>
+    <div style="display: flex; gap: 20px;">
+        <div class="section" style="flex: 1;">
+            <h2>Timer Control</h2>
+            <h3 id="timerDisplay">00:00</h3>
+            <input type="number" id="timerSeconds" value="300" placeholder="Seconds" style="width: 80px;">
+            <button id="btnToggle" onclick="toggleTimer()" style="display: none; width: 80px;">Start</button>
+            <button onclick="resetTimer()">Set / Reset</button>
+        </div>
 
-    <div class="section">
-        <h2>Results</h2>
-        <select id="fileList"></select>
-        <button onclick="setActiveResult()">Set Active Result</button>
+        <div class="section" style="flex: 1;">
+            <h2>Results</h2>
+            <select id="fileList"></select>
+            <button onclick="setActiveResult()">Set Active Result</button>
+        </div>
     </div>
 
     <div class="section">
@@ -35,7 +37,7 @@
         </div>
     </div>
 
-    <div class="section">
+    <div class="section" id="logsSection" style="display: none;">
         <h2>System Logs</h2>
         <div id="logArea" style="height: 100px; overflow-y: scroll; background: #eee; font-family: monospace; padding: 5px; border: 1px solid #ccc;"></div>
     </div>
@@ -43,6 +45,11 @@
     <script>
         const ws = new WebSocket("ws://" + window.location.host + "/ws");
         const logArea = document.getElementById('logArea');
+
+        // Show logs if debug=true
+        if (new URLSearchParams(window.location.search).get('debug') === 'true') {
+            document.getElementById('logsSection').style.display = 'block';
+        }
 
         function logMsg(text) {
             const line = document.createElement('div');
