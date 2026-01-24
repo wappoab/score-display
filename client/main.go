@@ -28,7 +28,7 @@ type ConfigResponse struct {
 }
 
 func loadOrInitConfig() {
-	configPath := "config.json"
+	configPath := "client.json"
 	data, err := os.ReadFile(configPath)
 	if err == nil {
 		var cfg LocalConfig
@@ -128,7 +128,7 @@ go func() {
 			// Save to disk
 			cfg := LocalConfig{ClientName: clientName}
 			data, _ := json.MarshalIndent(cfg, "", "  ")
-			os.WriteFile("config.json", data, 0644)
+			os.WriteFile("client.json", data, 0644)
 			fmt.Printf("Updated client name to: %s\n", clientName)
 		}
 		w.WriteHeader(http.StatusOK)

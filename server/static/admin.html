@@ -23,13 +23,15 @@
             <button onclick="resetTimer()">Set / Reset</button>
         </div>
 
-        <div class="section" style="flex: 1;">
-            <h2>Results</h2>
-            <select id="fileList"></select>
-            <button onclick="setActiveResult()">Set Active Result</button>
+            <div class="section" style="flex: 1;">
+                <h2>Results</h2>
+                <select id="fileList"></select>
+                <button onclick="setActiveResult()">Set Active Result</button>
+                <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                    Served from: <span id="servedPath">loading...</span>
+                </div>
+            </div>
         </div>
-    </div>
-
     <div class="section">
         <h2>Connected Clients</h2>
         <div id="clientGrid" class="grid">
@@ -219,6 +221,11 @@
                 opt.innerText = f;
                 sel.appendChild(opt);
             });
+            
+            // Also load info
+            const infoRes = await fetch('/api/info');
+            const info = await infoRes.json();
+            document.getElementById('servedPath').innerText = info.resultsDir;
         }
         
         function setActiveResult() {
