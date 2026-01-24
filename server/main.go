@@ -8,17 +8,40 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
+	"runtime"
+	"time"
 )
+
+func openBrowser(url string) {
+	var err error
+	switch runtime.GOOS {
+	case "linux":
+		err = exec.Command("xdg-open", url).Start()
+	case "windows":
+		err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	case "darwin":
+		err = exec.Command("open", url).Start()
+	default:
+		err = fmt.Errorf("unsupported platform")
+	}
+	if err != nil {
+		log.Printf("Could not open browser automatically: %v", err)
+		log.Printf("Please open %s in your browser.", url)
+	}
+}
 
 func main() {
 	// Parse flags
 	resultsDirFlag := flag.String("results", "", "Path to the folder containing result files (overrides config)")
-	port := flag.Int("port", 8080, "Port to run the server on")
+	portFlag := flag.Int("port", 0, "Port to run the server on (overrides config)")
 	flag.Parse()
 
 	// Load Config
 	finalResultsDir := "./results" // Default
 	finalLanguage := "en"          // Default
+	finalPort := 8080              // Default
+	
 	cfg, err := loadConfig("server.json")
 	if err == nil {
 		if cfg.ResultsDir != "" {
@@ -27,11 +50,17 @@ func main() {
 		if cfg.Language != "" {
 			finalLanguage = cfg.Language
 		}
+		if cfg.Port != 0 {
+			finalPort = cfg.Port
+		}
 	}
 
 	// Flag overrides config
 	if *resultsDirFlag != "" {
 		finalResultsDir = *resultsDirFlag
+	}
+	if *portFlag != 0 {
+		finalPort = *portFlag
 	}
 
 	// Validate results directory
@@ -42,12 +71,12 @@ func main() {
 		}
 	}
 
-	fmt.Printf("Starting Display Server on port %d...\n", *port)
+	fmt.Printf("Starting Display Server on port %d...\n", finalPort)
 	fmt.Printf("Serving results from: %s\n", finalResultsDir)
 	fmt.Printf("Admin UI Language: %s\n", finalLanguage)
 
 	// Start mDNS discovery
-	startDiscovery(*port)
+	startDiscovery(finalPort)
 	defer stopDiscovery()
 
 	// Start WebSocket Hub
@@ -110,5 +139,14 @@ func main() {
 		})
 	})
 
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))
+	// Open Browser
+	go func() {
+		// Give the server a moment to bind
+		time.Sleep(500 * time.Millisecond)
+		url := fmt.Sprintf("http://localhost:%d/admin/admin.html", finalPort)
+		fmt.Printf("Launching browser at %s...\n", url)
+		openBrowser(url)
+	}()
+
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", finalPort), nil))
 }
