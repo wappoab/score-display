@@ -128,18 +128,38 @@ method=auto
 EOF
 chmod 600 "$NM_DIR/preconfigured.nmconnection"
 
-# C. Unblock WiFi (rfkill)
+# C. Unblock WiFi (rfkill) persistence
 mkdir -p "$MOUNT_ROOT/var/lib/systemd/rfkill"
 echo "0" > "$MOUNT_ROOT/var/lib/systemd/rfkill/platform-3f300000.mmcnr:wlan"
-echo "0" > "$MOUNT_ROOT/var/lib/systemd/rfkill/platform-fe300000.mmcnr:wlan"
+echo "0" > "$MOUNT_ROOT/var/lib/systemd/rfkill/platform-fe300000.mmcnr:wlan" 
 
 # D. Kernel Command Line Force Unblock
 if [ -f "$MOUNT_BOOT/cmdline.txt" ]; then
-    # Avoid duplicate append
     if ! grep -q "rfkill.default_state=1" "$MOUNT_BOOT/cmdline.txt"; then
         sed -i 's/$/ systemd.restore_state=0 rfkill.default_state=1/' "$MOUNT_BOOT/cmdline.txt"
     fi
 fi
+
+# E. One-shot service to force unblock on first boot (The Hammer)
+cat > "$MOUNT_ROOT/etc/systemd/system/force-wifi-on.service" <<EOF
+[Unit]
+Description=Force WiFi On
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/rfkill unblock wifi
+ExecStart=/usr/bin/nmcli radio wifi on
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable the service manually by creating the symlink
+mkdir -p "$MOUNT_ROOT/etc/systemd/system/multi-user.target.wants"
+ln -sf "/etc/systemd/system/force-wifi-on.service" "$MOUNT_ROOT/etc/systemd/system/multi-user.target.wants/force-wifi-on.service"
+
 
 # 8. Enable Auto-login
 echo "Enabling Auto-login..."

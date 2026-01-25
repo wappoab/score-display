@@ -35,21 +35,54 @@
 <body>
     <iframe id="resultFrame" src="about:blank"></iframe>
     <div id="timerOverlay">00:00</div>
+    <div id="statusIndicator" style="position: absolute; bottom: 10px; right: 10px; color: white; font-family: sans-serif; background: rgba(0,0,0,0.8); padding: 10px; z-index: 10000; border: 1px solid #444;">
+        Booting...
+    </div>
 
     <script>
         let config = null;
         let ws = null;
 
         async function init() {
+            const status = document.getElementById('statusIndicator');
+            if (!status) {
+                console.error("Status element not found!");
+                return;
+            }
+            
+            status.style.display = 'block';
+            status.innerText = "System Started. Waiting for Server...";
+            console.log("Init started...");
+
             try {
-                const cfgReq = await fetch('/config');
-                config = await cfgReq.json();
+                // Poll for configuration until Server is found
+                let retryCount = 0;
+                while (true) {
+                    try {
+                        const cfgReq = await fetch('/config');
+                        if (cfgReq.ok) {
+                            config = await cfgReq.json();
+                            if (config.connected && config.wsUrl) {
+                                break; // Server found!
+                            }
+                        }
+                    } catch (e) {
+                        console.log("Local config fetch failed, retrying...");
+                    }
+                    retryCount++;
+                    status.innerText = `Waiting for Server (Attempt ${retryCount})...`;
+                    await new Promise(r => setTimeout(r, 2000));
+                }
                 
+                status.innerText = "Connecting to " + config.wsUrl;
                 console.log("Connecting to Server at:", config.wsUrl);
                 ws = new WebSocket(config.wsUrl);
 
                 ws.onopen = () => {
                     console.log("WS Connected");
+                    status.style.color = "lime";
+                    status.innerText = "Connected: " + config.clientName;
+                    setTimeout(() => status.style.display = 'none', 5000); // Hide after 5s
                     document.title = config.clientName;
                     ws.send(JSON.stringify({ 
                         type: "handshake", 
@@ -64,7 +97,10 @@
 
                 ws.onclose = () => {
                     console.log("WS Closed. Retrying...");
-                    setTimeout(init, 3000);
+                    status.style.display = 'block';
+                    status.style.color = 'red';
+                    status.innerText = "Disconnected. Retrying...";
+                    setTimeout(init, 3000); // Re-run init to potentially re-discover if IP changed
                 };
 
             } catch (e) {
@@ -74,7 +110,9 @@
         }
 
         function handleMessage(msg) {
+            console.log("Rx Message:", msg.type, msg.payload);
             const overlay = document.getElementById('timerOverlay');
+            const status = document.getElementById('statusIndicator');
             const iframe = document.getElementById('resultFrame');
             
             if (msg.type === "timer_update") {
@@ -116,7 +154,7 @@
             }
         }
 
-        init();
+        window.addEventListener('load', init);
     </script>
 </body>
 </html>

@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"time"
 )
 
@@ -18,6 +19,8 @@ var (
 	serverPort int
 	clientName string
 	baseDir    string
+	serverFound bool
+	mu          sync.Mutex
 )
 
 type LocalConfig struct {
@@ -28,6 +31,7 @@ type ConfigResponse struct {
 	WsUrl         string `json:"wsUrl"`
 	ServerBaseUrl string `json:"serverBaseUrl"`
 	ClientName    string `json:"clientName"`
+	Connected     bool   `json:"connected"`
 }
 
 func init() {
@@ -58,8 +62,6 @@ func loadOrInitConfig() {
 	fmt.Printf("Generated and saved new client name: %s\n", clientName)
 }
 
-// launchBrowser attempts to start the browser and returns the command.
-// It returns an error if the command fails to start immediately.
 func launchBrowser(url string, kiosk bool) (*exec.Cmd, error) {
 	if kiosk && runtime.GOOS == "linux" {
 		browsers := []string{"chromium-browser", "chromium", "google-chrome"}
@@ -88,15 +90,12 @@ func launchBrowser(url string, kiosk bool) (*exec.Cmd, error) {
 				url,
 			}
 			cmd := exec.Command(browserCmd, args...)
-			// Important: Separate process group so if we die, it might survive (or vice versa management)
-			// But for supervision, we want to wait on it.
 			err := cmd.Start()
 			return cmd, err
 		}
 		log.Println("Chromium not found for Kiosk mode.")
 	}
 
-	// Fallback / Desktop
 	var err error
 	switch runtime.GOOS {
 	case "linux":
@@ -122,13 +121,10 @@ func browserSupervisor(url string, kiosk bool) {
 		}
 
 		if cmd != nil {
-			// If we have a cmd object (linux kiosk), wait for it to exit
 			log.Println("Supervisor: Browser running. Waiting for exit...")
 			err := cmd.Wait()
 			log.Printf("Supervisor: Browser exited (%v). Restarting in 2s...", err)
 		} else {
-			// xdg-open/open usually detach immediately, so we can't supervise them easily.
-			// In that case, we just exit the supervisor loop or just wait forever.
 			if !kiosk {
 				log.Println("Supervisor: Browser launched in detached mode. Supervisor exiting.")
 				return
@@ -147,29 +143,32 @@ func main() {
 	fmt.Printf("Running from: %s\n", baseDir)
 	loadOrInitConfig()
 
-	// 1. Discovery Loop
-	for {
-		entry, err := findServer()
-		if err == nil {
-			serverIP = entry.IP
-			serverPort = entry.Port
-			fmt.Printf("Connected to Server at %s:%d\n", serverIP, serverPort)
-			break
+	// 1. Start Server Discovery in Background
+	go func() {
+		for {
+			entry, err := findServer()
+			if err == nil {
+				mu.Lock()
+				serverIP = entry.IP
+				serverPort = entry.Port
+				serverFound = true
+				mu.Unlock()
+				fmt.Printf("Connected to Server at %s:%d\n", serverIP, serverPort)
+				break // Found it, stop scanning (or keep scanning to reconnect? For now stop)
+			}
+			fmt.Printf("Discovery failed: %v. Retrying in 2s...\n", err)
+			time.Sleep(2 * time.Second)
 		}
-		fmt.Printf("Discovery failed: %v. Retrying in 2s...\n", err)
-		time.Sleep(2 * time.Second)
-	}
+	}()
 
-	// 2. Start Local Client Server
+	// 2. Start Local Client Server immediately
 	port := 8081
 	url := fmt.Sprintf("http://localhost:%d", port)
 	
-	// Start Supervisor
 	go browserSupervisor(url, *kiosk)
 
 	fmt.Printf("Starting Local Client Server on port %d...\n", port)
 	
-	// Serve static files relative to executable
 	staticDir := filepath.Join(baseDir, "static")
 	if _, err := os.Stat(staticDir); os.IsNotExist(err) {
 		if _, err := os.Stat("client/static"); err == nil {
@@ -181,18 +180,19 @@ func main() {
 	fs := http.FileServer(http.Dir(staticDir))
 	http.Handle("/", fs)
 
-	// Serve Config
 	http.HandleFunc("/config", func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		config := ConfigResponse{
 			WsUrl:         fmt.Sprintf("ws://%s:%d/ws", serverIP, serverPort),
 			ServerBaseUrl: fmt.Sprintf("http://%s:%d", serverIP, serverPort),
 			ClientName:    clientName,
+			Connected:     serverFound,
 		}
+		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(config)
 	})
 
-	// Update Config
 	http.HandleFunc("/config/update", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -206,7 +206,6 @@ func main() {
 
 		if newCfg.ClientName != "" {
 			clientName = newCfg.ClientName
-			// Save to disk
 			configPath := filepath.Join(baseDir, "client.json")
 			cfg := LocalConfig{ClientName: clientName}
 			data, _ := json.MarshalIndent(cfg, "", "  ")
