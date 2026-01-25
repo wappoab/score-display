@@ -37,10 +37,16 @@ echo "--- Configuration Required ---"
 read -p "Enter WiFi SSID: " WIFI_SSID
 read -s -p "Enter WiFi Password: " WIFI_PASS
 echo ""
+read -p "Enter WiFi Country Code (e.g., SE, US, GB): " WIFI_COUNTRY
+echo ""
 read -s -p "Enter Password for user '$PI_USER': " PI_PASS
 echo ""
 echo "------------------------------"
 echo ""
+
+if [ -z "$WIFI_COUNTRY" ]; then
+    WIFI_COUNTRY="SE"
+fi
 
 # 3. Prepare Image
 if [ ! -f "$OUTPUT_IMAGE" ]; then
@@ -80,14 +86,30 @@ ENCRYPTED_PASS=$(echo -n "$PI_PASS" | openssl passwd -6 -stdin)
 echo "$PI_USER:$ENCRYPTED_PASS" > "$MOUNT_BOOT/userconf.txt"
 touch "$MOUNT_BOOT/ssh" # Enable SSH
 
-# 7. Configure WiFi (NetworkManager)
-echo "Configuring WiFi for SSID: $WIFI_SSID..."
+# 7. Configure WiFi
+echo "Configuring WiFi ($WIFI_COUNTRY)..."
+
+# A. wpa_supplicant (Legacy but robust fallback for first boot)
+cat > "$MOUNT_BOOT/wpa_supplicant.conf" <<EOF
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+country=$WIFI_COUNTRY
+
+network={
+    ssid="$WIFI_SSID"
+    psk="$WIFI_PASS"
+}
+EOF
+
+# B. NetworkManager (Modern standard)
 NM_DIR="$MOUNT_ROOT/etc/NetworkManager/system-connections"
 mkdir -p "$NM_DIR"
 cat > "$NM_DIR/preconfigured.nmconnection" <<EOF
 [connection]
 id=preconfigured
 type=wifi
+autoconnect=true
+autoconnect-priority=99
 
 [wifi]
 mode=infrastructure
@@ -105,6 +127,12 @@ method=auto
 method=auto
 EOF
 chmod 600 "$NM_DIR/preconfigured.nmconnection"
+
+# C. Unblock WiFi (rfkill)
+# Writing to this file tells systemd-rfkill to unblock on boot
+mkdir -p "$MOUNT_ROOT/var/lib/systemd/rfkill"
+echo "0" > "$MOUNT_ROOT/var/lib/systemd/rfkill/platform-3f300000.mmcnr:wlan"
+echo "0" > "$MOUNT_ROOT/var/lib/systemd/rfkill/platform-fe300000.mmcnr:wlan" 
 
 # 8. Enable Auto-login
 echo "Enabling Auto-login..."
@@ -141,6 +169,7 @@ echo "wlr-randr --output HDMI-A-1 --on" >> "$LABWC_DIR/autostart"
 # 11. Fix Permissions
 echo "Fixing file permissions..."
 chown -R 1000:1000 "$MOUNT_ROOT/home/pi"
+chown 0:0 "$NM_DIR/preconfigured.nmconnection" # NM config must be root
 
 echo "=== Success ==="
 echo "The image is ready: $OUTPUT_IMAGE"
