@@ -1,4 +1,4 @@
-.PHONY: server client windows-server linux-arm-client clean
+.PHONY: server client windows-server linux-arm-client linux-arm64-client clean
 
 server:
 	@echo "Building Server (Linux)..."
@@ -16,9 +16,14 @@ windows-server:
 	@echo "Server built at bin/server.exe"
 
 linux-arm-client:
-	@echo "Building Client (Linux ARM/Raspberry Pi)..."
+	@echo "Building Client (Linux ARM 32-bit/Raspberry Pi)..."
 	cd client && GOOS=linux GOARCH=arm go build -o ../bin/client-arm .
 	@echo "Client built at bin/client-arm"
+
+linux-arm64-client:
+	@echo "Building Client (Linux ARM 64-bit/Raspberry Pi)..."
+	cd client && GOOS=linux GOARCH=arm64 go build -o ../bin/client-arm64 .
+	@echo "Client built at bin/client-arm64"
 
 run-server: server
 	./bin/server
