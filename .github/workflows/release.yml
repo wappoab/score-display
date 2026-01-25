@@ -1,0 +1,63 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger on tags like v1.0.0
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21' # Or your specific version
+
+      - name: Build Windows Server
+        run: |
+          make windows-server
+          # Prepare archive
+          mkdir -p dist/server-windows
+          cp bin/server.exe dist/server-windows/
+          cp -r server/static dist/server-windows/
+          cp README.md dist/server-windows/
+          cd dist
+          zip -r server-windows-amd64.zip server-windows/
+
+      - name: Build Linux ARM Client (32-bit)
+        run: |
+          make linux-arm-client
+          # Prepare archive
+          mkdir -p dist/client-linux-arm
+          cp bin/client-arm dist/client-linux-arm/client
+          cp -r client/static dist/client-linux-arm/
+          cd dist
+          tar -czvf client-linux-arm.tar.gz client-linux-arm/
+
+      - name: Build Linux ARM64 Client (64-bit)
+        run: |
+          make linux-arm64-client
+          # Prepare archive
+          mkdir -p dist/client-linux-arm64
+          cp bin/client-arm64 dist/client-linux-arm64/client
+          cp -r client/static dist/client-linux-arm64/
+          cd dist
+          tar -czvf client-linux-arm64.tar.gz client-linux-arm64/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            dist/server-windows-amd64.zip
+            dist/client-linux-arm.tar.gz
+            dist/client-linux-arm64.tar.gz
+          draft: false
+          prerelease: false
