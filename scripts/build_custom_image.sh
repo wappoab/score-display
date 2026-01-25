@@ -129,10 +129,17 @@ EOF
 chmod 600 "$NM_DIR/preconfigured.nmconnection"
 
 # C. Unblock WiFi (rfkill)
-# Writing to this file tells systemd-rfkill to unblock on boot
 mkdir -p "$MOUNT_ROOT/var/lib/systemd/rfkill"
 echo "0" > "$MOUNT_ROOT/var/lib/systemd/rfkill/platform-3f300000.mmcnr:wlan"
-echo "0" > "$MOUNT_ROOT/var/lib/systemd/rfkill/platform-fe300000.mmcnr:wlan" 
+echo "0" > "$MOUNT_ROOT/var/lib/systemd/rfkill/platform-fe300000.mmcnr:wlan"
+
+# D. Kernel Command Line Force Unblock
+if [ -f "$MOUNT_BOOT/cmdline.txt" ]; then
+    # Avoid duplicate append
+    if ! grep -q "rfkill.default_state=1" "$MOUNT_BOOT/cmdline.txt"; then
+        sed -i 's/$/ systemd.restore_state=0 rfkill.default_state=1/' "$MOUNT_BOOT/cmdline.txt"
+    fi
+fi
 
 # 8. Enable Auto-login
 echo "Enabling Auto-login..."

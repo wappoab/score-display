@@ -80,6 +80,10 @@ func launchBrowser(url string, kiosk bool) (*exec.Cmd, error) {
 				"--disable-infobars",
 				"--disable-restore-session-state",
 				"--check-for-update-interval=31536000",
+				"--start-maximized",
+				"--enable-features=OverlayScrollbar",
+				"--ozone-platform-hint=auto",
+				"--password-store=basic",
 				"--user-data-dir=" + os.TempDir() + "/display-client-chrome",
 				url,
 			}
