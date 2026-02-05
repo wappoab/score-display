@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"sort"
+	"strings"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -135,6 +137,15 @@ func (h *Hub) broadcastClientList() {
 			DisplayMode: mode,
 		})
 	}
+	
+	// Sort by Name, then Addr
+	sort.Slice(list, func(i, j int) bool {
+		if list[i].Name != list[j].Name {
+			return strings.ToLower(list[i].Name) < strings.ToLower(list[j].Name)
+		}
+		return list[i].Addr < list[j].Addr
+	})
+
 	h.mu.Unlock() // Unlock before marshaling/broadcasting to avoid holding lock too long (though broadcastData re-locks)
 
 	msg := struct {

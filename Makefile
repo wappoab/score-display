@@ -1,4 +1,4 @@
-.PHONY: server client windows-server linux-arm-client linux-arm64-client clean
+.PHONY: server client windows-server linux-arm-client linux-arm64-client tizen-client clean
 
 server:
 	@echo "Building Server (Linux)..."
@@ -24,6 +24,12 @@ linux-arm64-client:
 	@echo "Building Client (Linux ARM 64-bit/Raspberry Pi)..."
 	cd client && GOOS=linux GOARCH=arm64 go build -o ../bin/client-arm64 .
 	@echo "Client built at bin/client-arm64"
+
+tizen-client:
+	@echo "Packaging Tizen Client (.wgt)..."
+	mkdir -p bin
+	cd client-tizen && zip -r ../bin/client-tizen.wgt . -x "docs/*"
+	@echo "Tizen Client packaged at bin/client-tizen.wgt"
 
 run-server: server
 	./bin/server

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <meta name="description" content="Display Client for Tizen TV"/>
+    <title>Display Client</title>
+    <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+    
+    <!-- 1. Result Content (Iframe) -->
+    <iframe id="resultFrame" src="about:blank"></iframe>
+
+    <!-- 2. Timer Overlay -->
+    <div id="timerOverlay">00:00</div>
+
+    <!-- 3. Status Indicator -->
+    <div id="statusIndicator">Booting...</div>
+
+    <!-- 4. Settings Overlay -->
+    <div id="settingsOverlay">
+        <div class="settings-box">
+            <h1>Settings</h1>
+            
+            <div class="settings-group">
+                <label for="serverIp">Server IP (e.g. 192.168.1.100)</label>
+                <input type="text" id="serverIp" placeholder="Enter Server IP" />
+            </div>
+
+            <div class="settings-group">
+                <label for="serverPort">Server Port</label>
+                <input type="text" id="serverPort" placeholder="8080" value="8080" />
+            </div>
+
+            <div class="settings-group">
+                <label for="clientName">Client Name</label>
+                <input type="text" id="clientName" placeholder="Client-TV" />
+            </div>
+
+            <button id="saveBtn" onclick="saveSettings()">Save & Connect</button>
+            
+            <div class="hint">Use Remote [Return] to close without saving (if connected).</div>
+        </div>
+    </div>
+
+    <!-- Tizen Scripts -->
+    <script src="$WEBAPIS/webapis/webapis.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
