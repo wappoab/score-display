@@ -24,6 +24,7 @@ type Client struct {
 	ID          string
 	Name        string
 	DisplayMode string // "show_timer" or "show_result"
+	ThemeMode   string // "dark" or "light"
 	closeOnce   sync.Once
 }
 
@@ -164,6 +165,7 @@ func (h *Hub) broadcastClientList() {
 		Name        string `json:"name"`
 		Addr        string `json:"addr"`
 		DisplayMode string `json:"display_mode"`
+		ThemeMode   string `json:"theme_mode"`
 	}
 	var list []ClientInfo
 	for client := range h.Clients {
@@ -175,11 +177,16 @@ func (h *Hub) broadcastClientList() {
 		if mode == "" {
 			mode = "show_result" // Default
 		}
+		themeMode := client.ThemeMode
+		if themeMode == "" {
+			themeMode = "dark" // Default
+		}
 		list = append(list, ClientInfo{
 			ID:          client.ID,
 			Name:        name,
 			Addr:        client.Conn.RemoteAddr().String(),
 			DisplayMode: mode,
+			ThemeMode:   themeMode,
 		})
 	}
 	h.mu.Unlock() // Unlock before expensive operations
@@ -205,9 +212,9 @@ func (h *Hub) broadcastClientList() {
 		log.Printf("Error marshaling client list: %v", err)
 		return
 	}
-	
-	// Directly call broadcastData instead of sending to channel, 
-	// because we are already in the Run loop (or called from it) 
+
+	// Directly call broadcastData instead of sending to channel,
+	// because we are already in the Run loop (or called from it)
 	// and sending to channel would deadlock if channel is unbuffered and we are the reader.
 	h.broadcastData(data)
 }

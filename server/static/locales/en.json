@@ -11,8 +11,8 @@
     "connected_clients": "Connected Clients",
     "system_logs": "System Logs",
     "served_from": "Served from:",
-    "show_timer": "Show Timer",
-    "show_result": "Show Result",
+    "show_timer": "Timer",
+    "show_result": "Result",
     "rename": "Rename",
     "new_name_placeholder": "New Name"
 }

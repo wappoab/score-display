@@ -11,8 +11,8 @@
     "connected_clients": "Anslutna Skärmar",
     "system_logs": "Systemloggar",
     "served_from": "Serveras från:",
-    "show_timer": "Visa Timer",
-    "show_result": "Visa Resultat",
+    "show_timer": "Timer",
+    "show_result": "Resultat",
     "rename": "Byt Namn",
     "new_name_placeholder": "Nytt Namn"
 }

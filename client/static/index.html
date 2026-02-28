@@ -12,6 +12,7 @@
             height: 100%;
             border: none;
             display: block;
+            background: transparent;
         }
 
         #timerOverlay {
@@ -42,8 +43,21 @@
     <script>
         let config = null;
         let ws = null;
+        let currentThemeMode = "dark";
         let reconnectDelay = 3000;
         const maxReconnectDelay = 30000;
+
+        function applyTheme(themeMode) {
+            currentThemeMode = themeMode === "light" ? "light" : "dark";
+            const isLight = currentThemeMode === "light";
+            const overlay = document.getElementById('timerOverlay');
+            if (overlay) {
+                overlay.style.background = isLight ? "rgba(255,255,255,0.95)" : "rgba(0,0,0,0.9)";
+                overlay.style.color = isLight ? "#000" : "#fff";
+            }
+            document.documentElement.style.backgroundColor = isLight ? "#ffffff" : "#000000";
+            document.body.style.backgroundColor = isLight ? "#ffffff" : "#000000";
+        }
 
         function closeWebSocket() {
             if (ws) {
@@ -66,6 +80,7 @@
             status.style.display = 'block';
             status.innerText = "System Started. Waiting for Server...";
             console.log("Init started...");
+            applyTheme(currentThemeMode);
 
             try {
                 // Poll for configuration until Server is found
@@ -162,6 +177,8 @@
             } else if (msg.type === "set_result") {
                 const url = config.serverBaseUrl + "/results/" + msg.payload.file;
                 iframe.src = url;
+            } else if (msg.type === "theme_mode") {
+                applyTheme(msg.payload);
             } else if (msg.type === "update_config") {
                 if (msg.payload.key === "ClientName") {
                     const newName = msg.payload.value;

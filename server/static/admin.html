@@ -199,6 +199,7 @@
                 
                 const isTimer = c.display_mode === 'show_timer';
                 const isResult = c.display_mode === 'show_result' || !c.display_mode; // Default to result
+                const isDark = (c.theme_mode || 'dark') === 'dark';
 
                 // Use simple hash of ID for safe DOM IDs if ID contains special chars
                 // But c.id is usually just the name. Let's rely on c.id being safe or simple replace
@@ -208,7 +209,15 @@
                     <div class="mb-3 flex items-start justify-between gap-2">
                         <!-- Display Mode -->
                         <span id="name_display_${safeId}" class="text-base font-semibold text-slate-900">${c.name}</span>
-                        <button id="edit_btn_${safeId}" onclick="toggleEdit('${safeId}')" class="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-100">Edit</button>
+                        <div class="flex items-center gap-1">
+                            <button id="edit_btn_${safeId}" onclick="toggleEdit('${safeId}')" class="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-100">Edit</button>
+                            <button
+                                onclick="toggleClientTheme('${c.addr}', '${isDark ? 'dark' : 'light'}')"
+                                class="rounded-md px-2 py-1 text-[11px] font-semibold transition ${isDark ? 'bg-slate-900 text-white hover:bg-black' : 'bg-slate-200 text-slate-900 hover:bg-slate-300'}"
+                            >
+                                ${isDark ? 'Mörk' : 'Ljus'}
+                            </button>
+                        </div>
                         
                         <!-- Edit Mode (Hidden) -->
                         <div id="name_edit_${safeId}" class="hidden flex items-center gap-1">
@@ -264,6 +273,14 @@
             ws.send(JSON.stringify({ 
                 type: "client_command", 
                 payload: { target: addr, command: command } 
+            }));
+        }
+
+        function toggleClientTheme(addr, currentTheme) {
+            const nextCommand = currentTheme === 'dark' ? 'theme_light' : 'theme_dark';
+            ws.send(JSON.stringify({
+                type: "client_command",
+                payload: { target: addr, command: nextCommand }
             }));
         }
 

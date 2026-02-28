@@ -111,7 +111,7 @@ func (c *Client) readPump() {
 			}
 			break
 		}
-		
+
 		// Handle incoming messages
 		var msg Message
 		if err := json.Unmarshal(message, &msg); err != nil {
@@ -167,8 +167,12 @@ func (c *Client) readPump() {
 				for target := range c.Hub.Clients {
 					if target.Conn.RemoteAddr().String() == payload.Target {
 						targetClient = target
-						if payload.Command != "rename" {
+						if payload.Command == "show_timer" || payload.Command == "show_result" {
 							target.DisplayMode = payload.Command // Update state immediately under lock
+						} else if payload.Command == "theme_dark" {
+							target.ThemeMode = "dark"
+						} else if payload.Command == "theme_light" {
+							target.ThemeMode = "light"
 						}
 						break
 					}
@@ -200,6 +204,29 @@ func (c *Client) readPump() {
 							}{Client: targetClient, Msg: msgData}
 						}
 
+					} else if payload.Command == "theme_dark" || payload.Command == "theme_light" {
+						theme := "dark"
+						if payload.Command == "theme_light" {
+							theme = "light"
+						}
+						msgData, err := json.Marshal(struct {
+							Type    string `json:"type"`
+							Payload string `json:"payload"`
+						}{
+							Type:    "theme_mode",
+							Payload: theme,
+						})
+						if err != nil {
+							log.Printf("Error marshaling theme_mode message: %v", err)
+						} else {
+							c.Hub.SendTo <- struct {
+								Client *Client
+								Msg    []byte
+							}{Client: targetClient, Msg: msgData}
+						}
+
+						// Broadcast updated list (ThemeMode changed)
+						c.Hub.broadcastClientList()
 					} else {
 						// Forward other commands as display_mode
 						msgData, err := json.Marshal(struct {
@@ -333,5 +360,23 @@ func serveWs(hub *Hub, timerMgr *TimerManager, w http.ResponseWriter, r *http.Re
 		log.Printf("Error marshaling display mode message: %v", err)
 	} else {
 		client.Send <- modeMsg
+	}
+
+	// Send initial theme mode (defaults to "dark" if empty)
+	initTheme := client.ThemeMode
+	if initTheme == "" {
+		initTheme = "dark"
+	}
+	themeMsg, err := json.Marshal(struct {
+		Type    string `json:"type"`
+		Payload string `json:"payload"`
+	}{
+		Type:    "theme_mode",
+		Payload: initTheme,
+	})
+	if err != nil {
+		log.Printf("Error marshaling theme mode message: %v", err)
+	} else {
+		client.Send <- themeMsg
 	}
 }
