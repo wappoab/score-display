@@ -17,6 +17,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode/utf8"
 )
 
 func openBrowser(url string) {
@@ -59,6 +60,21 @@ func detectHTMLCharset(path string) string {
 	default:
 		return "iso-8859-1"
 	}
+}
+
+func detectTextCharset(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "iso-8859-1"
+	}
+	if len(data) > 8192 {
+		data = data[:8192]
+	}
+	if utf8.Valid(data) {
+		return "utf-8"
+	}
+	// Legacy exports are often Latin-1.
+	return "iso-8859-1"
 }
 
 func main() {
@@ -162,8 +178,11 @@ func main() {
 			return
 		}
 
-		if ext := strings.ToLower(filepath.Ext(absPath)); ext == ".htm" || ext == ".html" {
+		switch ext := strings.ToLower(filepath.Ext(absPath)); ext {
+		case ".htm", ".html":
 			w.Header().Set("Content-Type", "text/html; charset="+detectHTMLCharset(absPath))
+		case ".txt":
+			w.Header().Set("Content-Type", "text/plain; charset="+detectTextCharset(absPath))
 		}
 
 		http.ServeFile(w, r, absPath)
