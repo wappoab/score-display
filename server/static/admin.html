@@ -302,7 +302,9 @@
             const files = await res.json();
             const sel = document.getElementById('fileList');
             sel.innerHTML = '';
-            files.forEach(f => {
+            files
+                .filter(f => /\.(txt|html?)$/i.test(f))
+                .forEach(f => {
                 const opt = document.createElement('option');
                 opt.value = f;
                 opt.innerText = f;

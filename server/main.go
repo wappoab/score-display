@@ -14,6 +14,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -195,6 +196,11 @@ func main() {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		sort.Slice(files, func(i, j int) bool {
+			return files[i].ModTime().After(files[j].ModTime())
+		})
+
 		var fileNames []string
 		for _, f := range files {
 			if !f.IsDir() {
