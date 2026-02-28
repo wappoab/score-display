@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -11,7 +12,9 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -34,6 +37,30 @@ func openBrowser(url string) {
 	}
 }
 
+func detectHTMLCharset(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "iso-8859-1"
+	}
+	if len(data) > 8192 {
+		data = data[:8192]
+	}
+	lower := bytes.ToLower(data)
+	switch {
+	case bytes.Contains(lower, []byte("charset=utf-8")):
+		return "utf-8"
+	case bytes.Contains(lower, []byte("charset=windows-1252")):
+		return "windows-1252"
+	case bytes.Contains(lower, []byte("charset=iso-8859-1")):
+		return "iso-8859-1"
+	case bytes.Contains(lower, []byte("name=generator")) && bytes.Contains(lower, []byte("content=\"ruter\"")):
+		// Legacy Ruter exports are typically Latin-1.
+		return "iso-8859-1"
+	default:
+		return "iso-8859-1"
+	}
+}
+
 func main() {
 	// Parse flags
 	resultsDirFlag := flag.String("results", "", "Path to the folder containing result files (overrides config)")
@@ -44,7 +71,7 @@ func main() {
 	finalResultsDir := "./results" // Default
 	finalLanguage := "en"          // Default
 	finalPort := 8080              // Default
-	
+
 	cfg, err := loadConfig("server.json")
 	if err == nil {
 		if cfg.ResultsDir != "" {
@@ -98,7 +125,7 @@ func main() {
 	// Serve static files from 'server/static' mapped to /admin/
 	fs := http.FileServer(http.Dir("server/static"))
 	http.Handle("/admin/", http.StripPrefix("/admin/", fs))
-	
+
 	// Redirect root to admin for convenience
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
@@ -110,8 +137,37 @@ func main() {
 
 	// 3. Results File Server
 	// Maps /results/filename.html -> finalResultsDir/filename.html
-	resultsFs := http.FileServer(http.Dir(finalResultsDir))
-	http.Handle("/results/", http.StripPrefix("/results/", resultsFs))
+	absResultsDir, err := filepath.Abs(finalResultsDir)
+	if err != nil {
+		log.Fatalf("Failed to resolve results directory path: %v", err)
+	}
+	http.HandleFunc("/results/", func(w http.ResponseWriter, r *http.Request) {
+		rel := strings.TrimPrefix(r.URL.Path, "/results/")
+		rel = strings.TrimPrefix(filepath.Clean("/"+rel), "/")
+		if rel == "" || rel == "." {
+			http.NotFound(w, r)
+			return
+		}
+
+		fullPath := filepath.Join(absResultsDir, rel)
+		absPath, err := filepath.Abs(fullPath)
+		if err != nil {
+			http.Error(w, "invalid path", http.StatusBadRequest)
+			return
+		}
+
+		sep := string(os.PathSeparator)
+		if absPath != absResultsDir && !strings.HasPrefix(absPath, absResultsDir+sep) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		if ext := strings.ToLower(filepath.Ext(absPath)); ext == ".htm" || ext == ".html" {
+			w.Header().Set("Content-Type", "text/html; charset="+detectHTMLCharset(absPath))
+		}
+
+		http.ServeFile(w, r, absPath)
+	})
 
 	// 4. API: List Files
 	http.HandleFunc("/api/files", func(w http.ResponseWriter, r *http.Request) {
