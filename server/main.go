@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -9,7 +10,9 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"runtime"
+	"syscall"
 	"time"
 )
 
@@ -148,5 +151,34 @@ func main() {
 		openBrowser(url)
 	}()
 
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", finalPort), nil))
+	// Create HTTP server
+	server := &http.Server{
+		Addr: fmt.Sprintf(":%d", finalPort),
+	}
+
+	// Setup signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	// Start server in goroutine
+	go func() {
+		log.Printf("Server listening on port %d\n", finalPort)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server error: %v", err)
+		}
+	}()
+
+	// Wait for shutdown signal
+	<-sigChan
+	log.Println("\nShutdown signal received, gracefully shutting down...")
+
+	// Graceful shutdown with timeout
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("Server shutdown error: %v", err)
+	}
+
+	log.Println("Server stopped")
 }

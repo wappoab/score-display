@@ -42,6 +42,19 @@
     <script>
         let config = null;
         let ws = null;
+        let reconnectDelay = 3000;
+        const maxReconnectDelay = 30000;
+
+        function closeWebSocket() {
+            if (ws) {
+                ws.onclose = null;
+                ws.onerror = null;
+                ws.onmessage = null;
+                ws.onopen = null;
+                ws.close();
+                ws = null;
+            }
+        }
 
         async function init() {
             const status = document.getElementById('statusIndicator');
@@ -73,34 +86,50 @@
                     status.innerText = `Waiting for Server (Attempt ${retryCount})...`;
                     await new Promise(r => setTimeout(r, 2000));
                 }
-                
+
+                // Close any existing WebSocket before creating new one
+                closeWebSocket();
+
                 status.innerText = "Connecting to " + config.wsUrl;
                 console.log("Connecting to Server at:", config.wsUrl);
                 ws = new WebSocket(config.wsUrl);
 
                 ws.onopen = () => {
                     console.log("WS Connected");
+                    reconnectDelay = 3000; // Reset backoff on successful connection
                     status.style.color = "lime";
                     status.innerText = "Connected: " + config.clientName;
                     setTimeout(() => status.style.display = 'none', 5000); // Hide after 5s
                     document.title = config.clientName;
-                    ws.send(JSON.stringify({ 
-                        type: "handshake", 
-                        payload: { name: config.clientName, id: config.clientName } 
+                    ws.send(JSON.stringify({
+                        type: "handshake",
+                        payload: { name: config.clientName, id: config.clientName }
                     }));
                 };
 
                 ws.onmessage = (event) => {
-                    const msg = JSON.parse(event.data);
+                    let msg;
+                    try {
+                        msg = JSON.parse(event.data);
+                    } catch (e) {
+                        console.error("Failed to parse message:", event.data, e);
+                        return;
+                    }
                     handleMessage(msg);
                 };
 
                 ws.onclose = () => {
-                    console.log("WS Closed. Retrying...");
+                    console.log("WS Closed. Retrying in " + reconnectDelay + "ms...");
                     status.style.display = 'block';
                     status.style.color = 'red';
                     status.innerText = "Disconnected. Retrying...";
-                    setTimeout(init, 3000); // Re-run init to potentially re-discover if IP changed
+                    setTimeout(init, reconnectDelay);
+                    // Exponential backoff
+                    reconnectDelay = Math.min(reconnectDelay * 1.5, maxReconnectDelay);
+                };
+
+                ws.onerror = (error) => {
+                    console.error("WebSocket error:", error);
                 };
 
             } catch (e) {
@@ -143,12 +172,17 @@
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({ clientName: newName })
-                    }).then(() => {
+                    }).then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}`);
+                        }
                         config.clientName = newName;
-                        ws.send(JSON.stringify({ 
-                            type: "handshake", 
-                            payload: { name: newName, id: newName } 
+                        ws.send(JSON.stringify({
+                            type: "handshake",
+                            payload: { name: newName, id: newName }
                         }));
+                    }).catch(err => {
+                        console.error("Failed to update config:", err);
                     });
                 }
             }

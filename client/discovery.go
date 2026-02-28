@@ -16,13 +16,17 @@ type ServiceEntry struct {
 }
 
 func findServer() (*ServiceEntry, error) {
+	return findServerWithTimeout(5 * time.Second)
+}
+
+func findServerWithTimeout(timeout time.Duration) (*ServiceEntry, error) {
 	resolver, err := zeroconf.NewResolver(nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize resolver: %w", err)
 	}
 
-	entries := make(chan *zeroconf.ServiceEntry)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	entries := make(chan *zeroconf.ServiceEntry, 10)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	// Browse for _display._tcp
@@ -32,17 +36,23 @@ func findServer() (*ServiceEntry, error) {
 	}
 
 	fmt.Println("Scanning for Display Server...")
-	for entry := range entries {
-		if len(entry.AddrIPv4) > 0 {
-			ip := entry.AddrIPv4[0].String()
-			log.Printf("Found Server: %s at %s:%d", entry.Instance, ip, entry.Port)
-			return &ServiceEntry{
-				Host: entry.HostName,
-				Port: entry.Port,
-				IP:   ip,
-			}, nil
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("no server found within timeout")
+		case entry, ok := <-entries:
+			if !ok {
+				return nil, fmt.Errorf("no server found within timeout")
+			}
+			if len(entry.AddrIPv4) > 0 {
+				ip := entry.AddrIPv4[0].String()
+				log.Printf("Found Server: %s at %s:%d", entry.Instance, ip, entry.Port)
+				return &ServiceEntry{
+					Host: entry.HostName,
+					Port: entry.Port,
+					IP:   ip,
+				}, nil
+			}
 		}
 	}
-
-	return nil, fmt.Errorf("no server found within timeout")
 }

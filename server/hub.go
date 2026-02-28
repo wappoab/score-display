@@ -24,6 +24,14 @@ type Client struct {
 	ID          string
 	Name        string
 	DisplayMode string // "show_timer" or "show_result"
+	closeOnce   sync.Once
+}
+
+// closeClientSend safely closes the client's Send channel exactly once
+func (c *Client) closeClientSend() {
+	c.closeOnce.Do(func() {
+		close(c.Send)
+	})
 }
 
 type Hub struct {
@@ -39,7 +47,8 @@ type Hub struct {
 	State struct {
 		ActiveResult string
 	}
-	mu sync.Mutex // Protects Clients map and State
+	MaxClients int        // Maximum allowed clients (0 = unlimited)
+	mu         sync.Mutex // Protects Clients map and State
 }
 
 func NewHub() *Hub {
@@ -51,8 +60,9 @@ func NewHub() *Hub {
 		SendTo: make(chan struct {
 			Client *Client
 			Msg    []byte
-		}),
-		Clients: make(map[*Client]bool),
+		}, 256),
+		Clients:    make(map[*Client]bool),
+		MaxClients: 100, // Default connection limit
 	}
 	return h
 }
@@ -62,6 +72,29 @@ func (h *Hub) Run() {
 		select {
 		case client := <-h.Register:
 			h.mu.Lock()
+			// Check connection limit
+			if h.MaxClients > 0 && len(h.Clients) >= h.MaxClients {
+				h.mu.Unlock()
+				log.Printf("Client rejected (limit reached): %s", client.Conn.RemoteAddr())
+				// Send error message and close
+				errorMsg, err := json.Marshal(struct {
+					Type    string `json:"type"`
+					Payload string `json:"payload"`
+				}{
+					Type:    "error",
+					Payload: "Server connection limit reached",
+				})
+				if err != nil {
+					log.Printf("Error marshaling rejection message: %v", err)
+				} else {
+					select {
+					case client.Send <- errorMsg:
+					default:
+					}
+				}
+				client.closeClientSend()
+				continue
+			}
 			h.Clients[client] = true
 			h.mu.Unlock()
 			log.Printf("Client connected: %s", client.Conn.RemoteAddr())
@@ -71,7 +104,7 @@ func (h *Hub) Run() {
 			h.mu.Lock()
 			if _, ok := h.Clients[client]; ok {
 				delete(h.Clients, client)
-				close(client.Send)
+				client.closeClientSend()
 				log.Printf("Client disconnected: %s", client.Conn.RemoteAddr())
 			}
 			h.mu.Unlock()
@@ -87,8 +120,10 @@ func (h *Hub) Run() {
 				select {
 				case job.Client.Send <- job.Msg:
 				default:
-					close(job.Client.Send)
 					delete(h.Clients, job.Client)
+					h.mu.Unlock()
+					job.Client.closeClientSend()
+					continue
 				}
 			}
 			h.mu.Unlock()
@@ -101,14 +136,24 @@ func (h *Hub) Run() {
 
 func (h *Hub) broadcastData(message []byte) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
+	// Collect clients to remove
+	var toRemove []*Client
 	for client := range h.Clients {
 		select {
 		case client.Send <- message:
 		default:
-			close(client.Send)
-			delete(h.Clients, client)
+			toRemove = append(toRemove, client)
 		}
+	}
+	// Remove failed clients
+	for _, client := range toRemove {
+		delete(h.Clients, client)
+	}
+	h.mu.Unlock()
+
+	// Close channels outside the lock
+	for _, client := range toRemove {
+		client.closeClientSend()
 	}
 }
 
@@ -137,16 +182,15 @@ func (h *Hub) broadcastClientList() {
 			DisplayMode: mode,
 		})
 	}
-	
-	// Sort by Name, then Addr
+	h.mu.Unlock() // Unlock before expensive operations
+
+	// Sort by Name, then Addr (done outside lock)
 	sort.Slice(list, func(i, j int) bool {
 		if list[i].Name != list[j].Name {
 			return strings.ToLower(list[i].Name) < strings.ToLower(list[j].Name)
 		}
 		return list[i].Addr < list[j].Addr
 	})
-
-	h.mu.Unlock() // Unlock before marshaling/broadcasting to avoid holding lock too long (though broadcastData re-locks)
 
 	msg := struct {
 		Type    string       `json:"type"`
