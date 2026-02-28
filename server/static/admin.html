@@ -3,46 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Display Server Admin</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; }
-        .section { margin-bottom: 20px; padding: 10px; border: 1px solid #ccc; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
-        .card { padding: 10px; border: 1px solid #eee; background: #f9f9f9; }
-    </style>
+    <title>Displayadministration</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <h1>Display Admin</h1>
+<body class="min-h-screen bg-slate-100 text-slate-900">
+    <div class="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+        <header class="rounded-2xl bg-gradient-to-r from-slate-900 to-slate-700 px-6 py-5 text-white shadow-lg">
+            <h1 class="text-2xl font-bold tracking-tight">Displayadministration</h1>
+            <p class="mt-1 text-sm text-slate-200">Styr timer, resultat och anslutna skärmar</p>
+        </header>
 
-    <div style="display: flex; gap: 20px;">
-        <div class="section" style="flex: 1;">
-            <h2 data-i18n="timer_control">Timer Control</h2>
-            <h3 id="timerDisplay">00:00</h3>
-            <input type="number" id="timerSeconds" value="300" placeholder="Seconds" style="width: 80px;">
-            <button id="btnToggle" onclick="toggleTimer()" style="display: none; width: 80px;" data-i18n="start">Start</button>
-            <button onclick="resetTimer()" data-i18n="reset">Set / Reset</button>
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h2 class="text-lg font-semibold text-slate-800" data-i18n="timer_control">Timer Control</h2>
+                <div class="mt-4 rounded-xl bg-slate-900 px-4 py-5 text-center">
+                    <h3 id="timerDisplay" class="font-mono text-5xl font-bold tracking-wider text-cyan-300">00:00</h3>
+                </div>
+                <div class="mt-4 flex flex-wrap items-center gap-3">
+                    <div class="inline-flex items-center overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm focus-within:border-cyan-500 focus-within:ring-2 focus-within:ring-cyan-500/30">
+                        <input
+                            type="number"
+                            id="timerSeconds"
+                            value="15"
+                            min="1"
+                            step="1"
+                            placeholder="15"
+                            class="w-20 border-0 px-3 py-2 text-sm text-slate-900 focus:outline-none"
+                        >
+                        <span class="border-l border-slate-200 bg-slate-50 px-2 py-2 text-xs font-medium text-slate-600">m</span>
+                    </div>
+                    <button id="btnToggle" onclick="toggleTimer()" class="hidden rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600" data-i18n="start">Start</button>
+                    <button id="btnReset" onclick="resetTimer()" class="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-700" data-i18n="reset">Set / Reset</button>
+                </div>
+            </section>
+
+            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h2 class="text-lg font-semibold text-slate-800" data-i18n="results">Results</h2>
+                <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <select id="fileList" class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"></select>
+                    <button onclick="setActiveResult()" class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-700" data-i18n="set_active_result">Set Active Result</button>
+                </div>
+                <div class="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700" data-i18n="served_from">Served from:</span>
+                    <span id="servedPath" class="ml-1 break-all">loading...</span>
+                </div>
+            </section>
         </div>
 
-        <div class="section" style="flex: 1;">
-            <h2 data-i18n="results">Results</h2>
-            <select id="fileList"></select>
-            <button onclick="setActiveResult()" data-i18n="set_active_result">Set Active Result</button>
-            <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
-                <span data-i18n="served_from">Served from:</span> <span id="servedPath">loading...</span>
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 class="text-lg font-semibold text-slate-800" data-i18n="connected_clients">Connected Clients</h2>
+            <div id="clientGrid" class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <!-- Client Cards will go here -->
             </div>
-        </div>
-    </div>
+        </section>
 
-    <div class="section">
-        <h2 data-i18n="connected_clients">Connected Clients</h2>
-        <div id="clientGrid" class="grid">
-            <!-- Client Cards will go here -->
-        </div>
-    </div>
-
-    <div class="section" id="logsSection" style="display: none;">
-        <h2 data-i18n="system_logs">System Logs</h2>
-        <div id="logArea" style="height: 100px; overflow-y: scroll; background: #eee; font-family: monospace; padding: 5px; border: 1px solid #ccc;"></div>
+        <section class="hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" id="logsSection">
+            <h2 class="text-lg font-semibold text-slate-800" data-i18n="system_logs">System Logs</h2>
+            <div id="logArea" class="mt-3 h-32 overflow-y-auto rounded-lg border border-slate-200 bg-slate-900 p-3 font-mono text-xs text-emerald-300"></div>
+        </section>
     </div>
 
     <script>
@@ -54,7 +72,7 @@
 
         // Show logs if debug=true
         if (new URLSearchParams(window.location.search).get('debug') === 'true') {
-            document.getElementById('logsSection').style.display = 'block';
+            document.getElementById('logsSection').classList.remove('hidden');
         }
 
         function logMsg(text) {
@@ -124,27 +142,28 @@
                 
                 // Update Button Visibility and Label
                 const btn = document.getElementById('btnToggle');
-                const resetBtn = btn.nextElementSibling; // The reset button
+                const resetBtn = document.getElementById('btnReset');
                 
                 if (total > 0) {
-                    btn.style.display = 'inline-block';
+                    btn.classList.remove('hidden');
                     if (timerRunning) {
                         btn.innerText = t("pause");
-                        btn.style.background = "#ffcccc";
-                        resetBtn.style.display = 'none'; // Hide reset while running
+                        btn.classList.remove('bg-emerald-500', 'hover:bg-emerald-600');
+                        btn.classList.add('bg-rose-500', 'hover:bg-rose-600');
+                        resetBtn.classList.add('hidden'); // Hide reset while running
                     } else {
-                        resetBtn.style.display = 'inline-block'; // Show reset
+                        resetBtn.classList.remove('hidden'); // Show reset
+                        btn.classList.remove('bg-rose-500', 'hover:bg-rose-600');
+                        btn.classList.add('bg-emerald-500', 'hover:bg-emerald-600');
                         if (s === total) {
                             btn.innerText = t("start");
-                            btn.style.background = "#ccffcc";
                         } else {
                             btn.innerText = t("resume");
-                            btn.style.background = "#ccffcc";
                         }
                     }
                 } else {
-                    btn.style.display = 'none';
-                    resetBtn.style.display = 'inline-block';
+                    btn.classList.add('hidden');
+                    resetBtn.classList.remove('hidden');
                 }
 
             } else if (msg.type === "client_list") {
@@ -163,7 +182,8 @@
         }
 
         function resetTimer() {
-             const seconds = parseInt(document.getElementById('timerSeconds').value);
+             const minutes = parseInt(document.getElementById('timerSeconds').value);
+             const seconds = (Number.isFinite(minutes) && minutes > 0 ? minutes : 15) * 60;
              ws.send(JSON.stringify({ type: "timer_control", payload: { action: "reset", seconds: seconds } }));
         }
 
@@ -175,7 +195,7 @@
                 if (c.name === "Admin") return;
 
                 const card = document.createElement('div');
-                card.className = 'card';
+                card.className = 'rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-sm';
                 
                 const isTimer = c.display_mode === 'show_timer';
                 const isResult = c.display_mode === 'show_result' || !c.display_mode; // Default to result
@@ -185,26 +205,28 @@
                 const safeId = c.id.replace(/[^a-zA-Z0-9]/g, '_');
 
                 card.innerHTML = `
-                    <div style="margin-bottom: 10px;">
+                    <div class="mb-3 flex items-start justify-between gap-2">
                         <!-- Display Mode -->
-                        <span id="name_display_${safeId}" style="font-weight: bold; font-size: 1.1em;">${c.name}</span>
-                        <button onclick="toggleEdit('${safeId}')" style="border: none; background: none; cursor: pointer;">✏️</button>
+                        <span id="name_display_${safeId}" class="text-base font-semibold text-slate-900">${c.name}</span>
+                        <button id="edit_btn_${safeId}" onclick="toggleEdit('${safeId}')" class="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-100">Edit</button>
                         
                         <!-- Edit Mode (Hidden) -->
-                        <span id="name_edit_${safeId}" style="display: none;">
-                            <input type="text" id="input_${safeId}" value="${c.name}" style="width: 100px;">
-                            <button onclick="saveName('${c.addr}', '${safeId}')">💾</button>
-                            <button onclick="toggleEdit('${safeId}')">❌</button>
-                        </span>
+                        <div id="name_edit_${safeId}" class="hidden flex items-center gap-1">
+                            <input type="text" id="input_${safeId}" value="${c.name}" class="w-28 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 focus:border-cyan-500 focus:outline-none">
+                            <button onclick="saveName('${c.addr}', '${safeId}')" class="rounded-md bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-700">Save</button>
+                            <button onclick="toggleEdit('${safeId}')" class="rounded-md bg-slate-300 px-2 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-400">Cancel</button>
+                        </div>
                     </div>
                     
-                    <small>${c.addr}</small><br><br>
-                    <button ${isTimer ? 'disabled' : ''} onclick="clientAction('${c.addr}', 'show_timer')">
+                    <div class="mb-3 text-xs text-slate-500 break-all">${c.addr}</div>
+                    <div class="flex gap-2">
+                    <button class="flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition ${isTimer ? 'cursor-not-allowed bg-cyan-700 text-white' : 'bg-cyan-100 text-cyan-900 hover:bg-cyan-200'}" ${isTimer ? 'disabled' : ''} onclick="clientAction('${c.addr}', 'show_timer')">
                         ${isTimer ? '● ' : ''}${t('show_timer')}
                     </button>
-                    <button ${isResult ? 'disabled' : ''} onclick="clientAction('${c.addr}', 'show_result')">
+                    <button class="flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition ${isResult ? 'cursor-not-allowed bg-indigo-700 text-white' : 'bg-indigo-100 text-indigo-900 hover:bg-indigo-200'}" ${isResult ? 'disabled' : ''} onclick="clientAction('${c.addr}', 'show_result')">
                         ${isResult ? '● ' : ''}${t('show_result')}
                     </button>
+                    </div>
                 `;
                 grid.appendChild(card);
             });
@@ -213,16 +235,16 @@
         function toggleEdit(safeId) {
             const display = document.getElementById('name_display_' + safeId);
             const edit = document.getElementById('name_edit_' + safeId);
-            const btn = display.nextElementSibling; // The pencil button
+            const btn = document.getElementById('edit_btn_' + safeId);
             
-            if (edit.style.display === 'none') {
-                edit.style.display = 'inline-block';
-                display.style.display = 'none';
-                btn.style.display = 'none';
+            if (edit.classList.contains('hidden')) {
+                edit.classList.remove('hidden');
+                display.classList.add('hidden');
+                btn.classList.add('hidden');
             } else {
-                edit.style.display = 'none';
-                display.style.display = 'inline';
-                btn.style.display = 'inline-block';
+                edit.classList.add('hidden');
+                display.classList.remove('hidden');
+                btn.classList.remove('hidden');
             }
         }
 
@@ -246,7 +268,8 @@
         }
 
         function sendTimer(action) {
-            const seconds = parseInt(document.getElementById('timerSeconds').value);
+            const minutes = parseInt(document.getElementById('timerSeconds').value);
+            const seconds = (Number.isFinite(minutes) && minutes > 0 ? minutes : 15) * 60;
             ws.send(JSON.stringify({ type: "timer_control", payload: { action, seconds } }));
         }
 
