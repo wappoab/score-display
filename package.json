@@ -1,0 +1,10 @@
+{
+  "name": "display-admin-assets",
+  "private": true,
+  "scripts": {
+    "build:admin-css": "tailwindcss -c tailwind.config.js -i ./server/static/admin.tailwind.css -o ./server/static/admin.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  }
+}

@@ -3,6 +3,7 @@ image/
 bin/
 server/server
 client/client
+node_modules
 
 # Results (User data)
 results/
