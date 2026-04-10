@@ -188,6 +188,15 @@ function handleMessage(msg) {
         if (iframe.src !== url) {
             iframe.src = url;
         }
+    } else if (msg.type === "set_zoom") {
+        const zoom = msg.payload;
+        if (zoom && zoom > 0) {
+            const scale = zoom / 100;
+            iframe.style.transform = `scale(${scale})`;
+            iframe.style.transformOrigin = 'top left';
+            iframe.style.width = (100 / scale) + '%';
+            iframe.style.height = (100 / scale) + '%';
+        }
     } else if (msg.type === "update_config") {
         // Handle Rename from Server
         if (msg.payload.key === "ClientName") {

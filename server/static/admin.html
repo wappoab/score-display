@@ -200,6 +200,7 @@
                 const isTimer = c.display_mode === 'show_timer';
                 const isResult = c.display_mode === 'show_result' || !c.display_mode; // Default to result
                 const isDark = (c.theme_mode || 'dark') === 'dark';
+                const zoom = c.zoom || 100;
 
                 // Use simple hash of ID for safe DOM IDs if ID contains special chars
                 // But c.id is usually just the name. Let's rely on c.id being safe or simple replace
@@ -228,6 +229,12 @@
                     </div>
                     
                     <div class="mb-3 text-xs text-slate-500 break-all">${c.addr}</div>
+                    <div class="mb-3 flex items-center gap-2">
+                        <label class="text-xs font-medium text-slate-600">${t('zoom')}:</label>
+                        <select onchange="setClientZoom('${c.addr}', this.value)" class="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 shadow-sm">
+                            ${[50,75,100,125,150,175,200,250,300].map(z => `<option value="${z}" ${z === zoom ? 'selected' : ''}>${z}%</option>`).join('')}
+                        </select>
+                    </div>
                     <div class="flex gap-2">
                     <button class="flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition ${isTimer ? 'cursor-not-allowed bg-cyan-700 text-white' : 'bg-cyan-100 text-cyan-900 hover:bg-cyan-200'}" ${isTimer ? 'disabled' : ''} onclick="clientAction('${c.addr}', 'show_timer')">
                         ${isTimer ? '● ' : ''}${t('show_timer')}
@@ -273,6 +280,13 @@
             ws.send(JSON.stringify({ 
                 type: "client_command", 
                 payload: { target: addr, command: command } 
+            }));
+        }
+
+        function setClientZoom(addr, zoom) {
+            ws.send(JSON.stringify({
+                type: "client_command",
+                payload: { target: addr, command: "set_zoom", value: String(zoom) }
             }));
         }
 

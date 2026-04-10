@@ -25,6 +25,7 @@ type Client struct {
 	Name        string
 	DisplayMode string // "show_timer" or "show_result"
 	ThemeMode   string // "dark" or "light"
+	Zoom        int    // Zoom percentage (100 = normal)
 	closeOnce   sync.Once
 }
 
@@ -166,6 +167,7 @@ func (h *Hub) broadcastClientList() {
 		Addr        string `json:"addr"`
 		DisplayMode string `json:"display_mode"`
 		ThemeMode   string `json:"theme_mode"`
+		Zoom        int    `json:"zoom"`
 	}
 	var list []ClientInfo
 	for client := range h.Clients {
@@ -181,12 +183,17 @@ func (h *Hub) broadcastClientList() {
 		if themeMode == "" {
 			themeMode = "dark" // Default
 		}
+		zoom := client.Zoom
+		if zoom == 0 {
+			zoom = 100 // Default
+		}
 		list = append(list, ClientInfo{
 			ID:          client.ID,
 			Name:        name,
 			Addr:        client.Conn.RemoteAddr().String(),
 			DisplayMode: mode,
 			ThemeMode:   themeMode,
+			Zoom:        zoom,
 		})
 	}
 	h.mu.Unlock() // Unlock before expensive operations

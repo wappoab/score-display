@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -173,6 +174,14 @@ func (c *Client) readPump() {
 							target.ThemeMode = "dark"
 						} else if payload.Command == "theme_light" {
 							target.ThemeMode = "light"
+						} else if payload.Command == "set_zoom" {
+							zoom := 100
+							if v := payload.Value; v != "" {
+								if z, err := strconv.Atoi(v); err == nil && z >= 50 && z <= 300 {
+									zoom = z
+								}
+							}
+							target.Zoom = zoom
 						}
 						break
 					}
@@ -226,6 +235,29 @@ func (c *Client) readPump() {
 						}
 
 						// Broadcast updated list (ThemeMode changed)
+						c.Hub.broadcastClientList()
+					} else if payload.Command == "set_zoom" {
+						zoom := 100
+						if v := payload.Value; v != "" {
+							if z, err := strconv.Atoi(v); err == nil && z >= 50 && z <= 300 {
+								zoom = z
+							}
+						}
+						msgData, err := json.Marshal(struct {
+							Type    string `json:"type"`
+							Payload int    `json:"payload"`
+						}{
+							Type:    "set_zoom",
+							Payload: zoom,
+						})
+						if err != nil {
+							log.Printf("Error marshaling set_zoom message: %v", err)
+						} else {
+							c.Hub.SendTo <- struct {
+								Client *Client
+								Msg    []byte
+							}{Client: targetClient, Msg: msgData}
+						}
 						c.Hub.broadcastClientList()
 					} else {
 						// Forward other commands as display_mode
@@ -378,5 +410,23 @@ func serveWs(hub *Hub, timerMgr *TimerManager, w http.ResponseWriter, r *http.Re
 		log.Printf("Error marshaling theme mode message: %v", err)
 	} else {
 		client.Send <- themeMsg
+	}
+
+	// Send initial zoom level (defaults to 100 if not set)
+	initZoom := client.Zoom
+	if initZoom == 0 {
+		initZoom = 100
+	}
+	zoomMsg, err := json.Marshal(struct {
+		Type    string `json:"type"`
+		Payload int    `json:"payload"`
+	}{
+		Type:    "set_zoom",
+		Payload: initZoom,
+	})
+	if err != nil {
+		log.Printf("Error marshaling zoom message: %v", err)
+	} else {
+		client.Send <- zoomMsg
 	}
 }

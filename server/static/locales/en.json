@@ -14,5 +14,6 @@
     "show_timer": "Timer",
     "show_result": "Result",
     "rename": "Rename",
-    "new_name_placeholder": "New Name"
+    "new_name_placeholder": "New Name",
+    "zoom": "Zoom"
 }
