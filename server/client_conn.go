@@ -137,12 +137,20 @@ func (c *Client) readPump() {
 			}
 		case "handshake":
 			var payload struct {
-				Name string `json:"name"`
-				ID   string `json:"id"`
+				Name  string `json:"name"`
+				ID    string `json:"id"`
+				Theme string `json:"theme,omitempty"`
+				Zoom  int    `json:"zoom,omitempty"`
 			}
 			if err := json.Unmarshal(msg.Payload, &payload); err == nil {
 				c.Name = payload.Name
 				c.ID = payload.ID
+				if payload.Theme == "light" || payload.Theme == "dark" {
+					c.ThemeMode = payload.Theme
+				}
+				if payload.Zoom >= 50 && payload.Zoom <= 300 {
+					c.Zoom = payload.Zoom
+				}
 				c.Hub.Handshake <- c
 			}
 		case "set_result":
@@ -394,39 +402,6 @@ func serveWs(hub *Hub, timerMgr *TimerManager, w http.ResponseWriter, r *http.Re
 		client.Send <- modeMsg
 	}
 
-	// Send initial theme mode (defaults to "dark" if empty)
-	initTheme := client.ThemeMode
-	if initTheme == "" {
-		initTheme = "dark"
-	}
-	themeMsg, err := json.Marshal(struct {
-		Type    string `json:"type"`
-		Payload string `json:"payload"`
-	}{
-		Type:    "theme_mode",
-		Payload: initTheme,
-	})
-	if err != nil {
-		log.Printf("Error marshaling theme mode message: %v", err)
-	} else {
-		client.Send <- themeMsg
-	}
-
-	// Send initial zoom level (defaults to 100 if not set)
-	initZoom := client.Zoom
-	if initZoom == 0 {
-		initZoom = 100
-	}
-	zoomMsg, err := json.Marshal(struct {
-		Type    string `json:"type"`
-		Payload int    `json:"payload"`
-	}{
-		Type:    "set_zoom",
-		Payload: initZoom,
-	})
-	if err != nil {
-		log.Printf("Error marshaling zoom message: %v", err)
-	} else {
-		client.Send <- zoomMsg
-	}
+	// Theme and zoom are NOT sent on connect — the client applies its own
+	// persisted values and reports them back via the handshake.
 }

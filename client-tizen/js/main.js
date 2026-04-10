@@ -45,10 +45,14 @@ function loadConfig() {
     const savedIp = localStorage.getItem('serverIp');
     const savedPort = localStorage.getItem('serverPort');
     const savedName = localStorage.getItem('clientName');
+    const savedTheme = localStorage.getItem('themeMode');
+    const savedZoom = localStorage.getItem('zoom');
 
     if (savedIp) config.serverIp = savedIp;
     if (savedPort) config.serverPort = savedPort;
     if (savedName) config.clientName = savedName;
+    config.themeMode = savedTheme || 'dark';
+    config.zoom = parseInt(savedZoom) || 100;
 
     // Pre-fill inputs
     document.getElementById('serverIp').value = config.serverIp;
@@ -123,9 +127,14 @@ function connect() {
             updateStatus("Connected: " + config.clientName, "lime");
             
             // Handshake
-            ws.send(JSON.stringify({ 
-                type: "handshake", 
-                payload: { name: config.clientName, id: config.clientName } 
+            ws.send(JSON.stringify({
+                type: "handshake",
+                payload: {
+                    name: config.clientName,
+                    id: config.clientName,
+                    theme: config.themeMode || 'dark',
+                    zoom: config.zoom || 100
+                }
             }));
             
             // Set title
@@ -188,9 +197,14 @@ function handleMessage(msg) {
         if (iframe.src !== url) {
             iframe.src = url;
         }
+    } else if (msg.type === "theme_mode") {
+        config.themeMode = msg.payload;
+        localStorage.setItem('themeMode', msg.payload);
     } else if (msg.type === "set_zoom") {
         const zoom = msg.payload;
         if (zoom && zoom > 0) {
+            config.zoom = zoom;
+            localStorage.setItem('zoom', String(zoom));
             const scale = zoom / 100;
             iframe.style.transform = `scale(${scale})`;
             iframe.style.transformOrigin = 'top left';
@@ -205,9 +219,14 @@ function handleMessage(msg) {
             document.title = config.clientName;
             
             // Re-handshake
-            ws.send(JSON.stringify({ 
-                type: "handshake", 
-                payload: { name: config.clientName, id: config.clientName } 
+            ws.send(JSON.stringify({
+                type: "handshake",
+                payload: {
+                    name: config.clientName,
+                    id: config.clientName,
+                    theme: config.themeMode || 'dark',
+                    zoom: config.zoom || 100
+                }
             }));
             
             // Show status briefly

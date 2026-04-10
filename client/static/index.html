@@ -102,6 +102,17 @@
                     await new Promise(r => setTimeout(r, 2000));
                 }
 
+                // Apply persisted theme and zoom from config
+                applyTheme(config.themeMode || "dark");
+                if (config.zoom && config.zoom !== 100) {
+                    const iframe = document.getElementById('resultFrame');
+                    const scale = config.zoom / 100;
+                    iframe.style.transform = `scale(${scale})`;
+                    iframe.style.transformOrigin = 'top left';
+                    iframe.style.width = (100 / scale) + '%';
+                    iframe.style.height = (100 / scale) + '%';
+                }
+
                 // Close any existing WebSocket before creating new one
                 closeWebSocket();
 
@@ -118,7 +129,12 @@
                     document.title = config.clientName;
                     ws.send(JSON.stringify({
                         type: "handshake",
-                        payload: { name: config.clientName, id: config.clientName }
+                        payload: {
+                            name: config.clientName,
+                            id: config.clientName,
+                            theme: config.themeMode || "dark",
+                            zoom: config.zoom || 100
+                        }
                     }));
                 };
 
@@ -179,6 +195,11 @@
                 iframe.src = url;
             } else if (msg.type === "theme_mode") {
                 applyTheme(msg.payload);
+                fetch('/config/update', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ themeMode: msg.payload })
+                }).catch(err => console.error("Failed to persist theme:", err));
             } else if (msg.type === "set_zoom") {
                 const zoom = msg.payload;
                 if (zoom && zoom > 0) {
@@ -187,6 +208,11 @@
                     iframe.style.transformOrigin = 'top left';
                     iframe.style.width = (100 / scale) + '%';
                     iframe.style.height = (100 / scale) + '%';
+                    fetch('/config/update', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ zoom: zoom })
+                    }).catch(err => console.error("Failed to persist zoom:", err));
                 }
             } else if (msg.type === "update_config") {
                 if (msg.payload.key === "ClientName") {
@@ -205,7 +231,12 @@
                         config.clientName = newName;
                         ws.send(JSON.stringify({
                             type: "handshake",
-                            payload: { name: newName, id: newName }
+                            payload: {
+                                name: newName,
+                                id: newName,
+                                theme: config.themeMode || "dark",
+                                zoom: config.zoom || 100
+                            }
                         }));
                     }).catch(err => {
                         console.error("Failed to update config:", err);

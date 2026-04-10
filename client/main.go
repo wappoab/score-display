@@ -23,22 +23,28 @@ import (
 var staticFiles embed.FS
 
 var (
-	serverIP   string
-	serverPort int
-	clientName string
-	baseDir    string
+	serverIP    string
+	serverPort  int
+	clientName  string
+	themeMode   string
+	zoomLevel   int
+	baseDir     string
 	serverFound bool
 	mu          sync.Mutex
 )
 
 type LocalConfig struct {
 	ClientName string `json:"clientName"`
+	ThemeMode  string `json:"themeMode,omitempty"`
+	Zoom       int    `json:"zoom,omitempty"`
 }
 
 type ConfigResponse struct {
 	WsUrl         string `json:"wsUrl"`
 	ServerBaseUrl string `json:"serverBaseUrl"`
 	ClientName    string `json:"clientName"`
+	ThemeMode     string `json:"themeMode"`
+	Zoom          int    `json:"zoom"`
 	Connected     bool   `json:"connected"`
 }
 
@@ -57,10 +63,20 @@ func loadOrInitConfig() {
 		var cfg LocalConfig
 		if json.Unmarshal(data, &cfg) == nil && cfg.ClientName != "" {
 			clientName = cfg.ClientName
+			themeMode = cfg.ThemeMode
+			zoomLevel = cfg.Zoom
+			if themeMode == "" {
+				themeMode = "dark"
+			}
+			if zoomLevel == 0 {
+				zoomLevel = 100
+			}
 			fmt.Printf("Loaded existing client name: %s\n", clientName)
 			return
 		}
 	}
+	themeMode = "dark"
+	zoomLevel = 100
 
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -295,6 +311,8 @@ func main() {
 			WsUrl:         fmt.Sprintf("ws://%s:%d/ws", serverIP, serverPort),
 			ServerBaseUrl: fmt.Sprintf("http://%s:%d", serverIP, serverPort),
 			ClientName:    clientName,
+			ThemeMode:     themeMode,
+			Zoom:          zoomLevel,
 			Connected:     serverFound,
 		}
 		mu.Unlock()
@@ -313,25 +331,32 @@ func main() {
 			return
 		}
 
+		mu.Lock()
 		if newCfg.ClientName != "" {
-			mu.Lock()
 			clientName = newCfg.ClientName
-			mu.Unlock()
-			configPath := filepath.Join(baseDir, "client.json")
-			cfg := LocalConfig{ClientName: clientName}
-			data, err := json.MarshalIndent(cfg, "", "  ")
-			if err != nil {
-				log.Printf("Error: Failed to marshal config: %v", err)
-				http.Error(w, "Failed to marshal config", http.StatusInternalServerError)
-				return
-			}
-			if err := os.WriteFile(configPath, data, 0644); err != nil {
-				log.Printf("Error: Failed to write config file: %v", err)
-				http.Error(w, "Failed to write config file", http.StatusInternalServerError)
-				return
-			}
-			fmt.Printf("Updated client name to: %s\n", clientName)
 		}
+		if newCfg.ThemeMode == "dark" || newCfg.ThemeMode == "light" {
+			themeMode = newCfg.ThemeMode
+		}
+		if newCfg.Zoom >= 50 && newCfg.Zoom <= 300 {
+			zoomLevel = newCfg.Zoom
+		}
+		cfg := LocalConfig{ClientName: clientName, ThemeMode: themeMode, Zoom: zoomLevel}
+		mu.Unlock()
+
+		configPath := filepath.Join(baseDir, "client.json")
+		data, err := json.MarshalIndent(cfg, "", "  ")
+		if err != nil {
+			log.Printf("Error: Failed to marshal config: %v", err)
+			http.Error(w, "Failed to marshal config", http.StatusInternalServerError)
+			return
+		}
+		if err := os.WriteFile(configPath, data, 0644); err != nil {
+			log.Printf("Error: Failed to write config file: %v", err)
+			http.Error(w, "Failed to write config file", http.StatusInternalServerError)
+			return
+		}
+		fmt.Printf("Updated config: name=%s theme=%s zoom=%d\n", clientName, themeMode, zoomLevel)
 		w.WriteHeader(http.StatusOK)
 	})
 
