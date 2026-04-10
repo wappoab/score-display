@@ -9,7 +9,6 @@ MOUNT_BOOT="/mnt/rpi_boot"
 
 # Client Files
 CLIENT_BINARY="bin/client-arm64"
-STATIC_DIR="client/static"
 PI_USER="pi"
 # ----------------------------
 
@@ -171,9 +170,8 @@ fi
 # 9. Install Display Client
 echo "Installing Display Client..."
 TARGET_DIR="$MOUNT_ROOT/home/pi/display-client"
-mkdir -p "$TARGET_DIR/static"
+mkdir -p "$TARGET_DIR"
 cp "$CLIENT_BINARY" "$TARGET_DIR/client"
-cp -r "$STATIC_DIR/"* "$TARGET_DIR/static/"
 chmod +x "$TARGET_DIR/client"
 
 # 10. Configure Autostart & Power Management
