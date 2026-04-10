@@ -157,8 +157,10 @@
                         btn.classList.add('bg-emerald-500', 'hover:bg-emerald-600');
                         if (s === total) {
                             btn.innerText = t("start");
-                        } else {
+                        } else if (s > 0) {
                             btn.innerText = t("resume");
+                        } else {
+                            btn.classList.add('hidden');
                         }
                     }
                 } else {
