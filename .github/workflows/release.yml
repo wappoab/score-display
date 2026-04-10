@@ -37,7 +37,6 @@ jobs:
           # Prepare archive
           mkdir -p dist/client-linux-arm
           cp bin/client-arm dist/client-linux-arm/client
-          cp -r client/static dist/client-linux-arm/
           cd dist
           tar -czvf client-linux-arm.tar.gz client-linux-arm/
 
@@ -47,7 +46,6 @@ jobs:
           # Prepare archive
           mkdir -p dist/client-linux-arm64
           cp bin/client-arm64 dist/client-linux-arm64/client
-          cp -r client/static dist/client-linux-arm64/
           cd dist
           tar -czvf client-linux-arm64.tar.gz client-linux-arm64/
 
