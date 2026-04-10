@@ -43,6 +43,13 @@ func (tm *TimerManager) Start() {
 
 	tm.State.Running = true
 	tm.goroutineRunning = true
+
+	// Drain any stale stop signal from a previous round
+	select {
+	case <-tm.stopChan:
+	default:
+	}
+
 	tm.ticker = time.NewTicker(1 * time.Second)
 
 	tm.broadcastState()
